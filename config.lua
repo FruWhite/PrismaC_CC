@@ -3,6 +3,7 @@ local CONFIG = {}
 CONFIG.DEFAULT_CHROMA_SENSOR_SIDE = "back"
 CONFIG.CRUCIBLE_WORKING_SIGNAL_SIDE = "right"
 CONFIG.BUS_CHECK_INTERVAL_SECONDS = 0.1
+CONFIG.AE2_CRAFT_TRIGGER_SIDE = "left"
 
 -- Peripheral names (edit to match your world/wired modem names).
 CONFIG.EXTERNAL_INPUT_CONTAINER = "input_container"
