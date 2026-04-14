@@ -6,10 +6,11 @@ CONFIG.BUS_CHECK_INTERVAL_SECONDS = 0.1
 CONFIG.AE2_CRAFT_TRIGGER_SIDE = "left"
 
 -- Peripheral names (edit to match your world/wired modem names).
-CONFIG.EXTERNAL_INPUT_CONTAINER = "input_container"
-CONFIG.INTERNAL_STORAGE_CONTAINER = "internal_storage_container"
-CONFIG.CRUCIBLE_INPUT_BUS = "prismatic_crucible_input_bus"
-CONFIG.OUTPUT_CONTAINER = "output_container"
+CONFIG.EXTERNAL_INPUT_CONTAINER = "minecraft:barrel_2"
+CONFIG.INTERNAL_STORAGE_CONTAINER = "minecraft:barrel_1"
+CONFIG.CRUCIBLE_INPUT_BUS = "gtceu:uv_input_bus_0"
+CONFIG.OUTPUT_CONTAINER = "minecraft:barrel_3"
+CONFIG.STATUS_MONITOR = "monitor_0"
 
 CONFIG.PRISMATIC_COLOR_BY_SIGNAL = {
     [1] = "red",
