@@ -1,7 +1,20 @@
 local M = {}
+local base_dir = rawget(_G, "PRISMATIC_BASE_DIR")
+if not base_dir then
+    local running_program = shell and shell.getRunningProgram and shell.getRunningProgram() or "utils.lua"
+    base_dir = fs.getDir(running_program)
+end
+
+local function load_local(name)
+    if base_dir and base_dir ~= "" then
+        return dofile(fs.combine(base_dir, name))
+    end
+    return dofile(name)
+end
+
 local config = rawget(_G, "PRISMATIC_CONFIG")
 if not config then
-    config = dofile("config.lua")
+    config = load_local("config.lua")
 end
 
 M.DEFAULT_CHROMA_SENSOR_SIDE = config.DEFAULT_CHROMA_SENSOR_SIDE
@@ -74,6 +87,41 @@ end
 function M.is_crucible_input_bus_empty()
     local input_bus = get_inventory(M.CRUCIBLE_INPUT_BUS)
     return next(input_bus.list()) == nil
+end
+
+function M.get_input_push_readiness(required_color)
+    if type(required_color) ~= "string" or required_color == "" then
+        error("required_color must be a non-empty string", 2)
+    end
+
+    local normalized = string.lower(required_color)
+    local working = M.is_crucible_working()
+    local current_color, signal, color_err = M.read_crucible_color()
+    local input_bus_empty = M.is_crucible_input_bus_empty()
+
+    local waiting_for = {}
+    if working then
+        waiting_for[#waiting_for + 1] = "crucible not working"
+    end
+    if not current_color then
+        waiting_for[#waiting_for + 1] = "valid crucible color signal"
+    elseif current_color ~= normalized then
+        waiting_for[#waiting_for + 1] = ("crucible color '%s' == '%s'"):format(current_color, normalized)
+    end
+    if not input_bus_empty then
+        waiting_for[#waiting_for + 1] = "input bus empty"
+    end
+
+    return {
+        required_color = normalized,
+        crucible_working = working,
+        current_color = current_color,
+        current_signal = signal,
+        color_error = color_err,
+        input_bus_empty = input_bus_empty,
+        waiting_for = waiting_for,
+        all_met = #waiting_for == 0,
+    }
 end
 
 function M.has_required_items_in_internal_storage(requirements)
@@ -165,12 +213,15 @@ local function push_one_item_by_name(source_name, target_name, item_name)
     return true
 end
 
-function M.push_item_to_input_bus(item_name, required_color)
+function M.push_item_to_input_bus(item_name, required_color, on_wait_update)
     if type(item_name) ~= "string" or item_name == "" then
         error("item_name must be a non-empty string", 2)
     end
     if type(required_color) ~= "string" or required_color == "" then
         error("required_color must be a non-empty string", 2)
+    end
+    if on_wait_update ~= nil and type(on_wait_update) ~= "function" then
+        error("on_wait_update must be a function or nil", 2)
     end
 
     required_color = string.lower(required_color)
@@ -179,11 +230,11 @@ function M.push_item_to_input_bus(item_name, required_color)
     end
 
     while true do
-        local working = M.is_crucible_working()
-        local current_color = M.read_crucible_color()
-        local input_bus_empty = M.is_crucible_input_bus_empty()
-
-        if (not working) and current_color == required_color and input_bus_empty then
+        local readiness = M.get_input_push_readiness(required_color)
+        if on_wait_update then
+            on_wait_update(readiness)
+        end
+        if readiness.all_met then
             break
         end
 
