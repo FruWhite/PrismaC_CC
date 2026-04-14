@@ -42,18 +42,59 @@ local function write_lines(lines)
     end
 end
 
-local function inventory_counts(peripheral_name)
+local function inventory_status(peripheral_name)
     local inv = wrap_if_exists(peripheral_name)
     if not inv or type(inv.list) ~= "function" then
-        return false, 0, 0
+        return {
+            ok = false,
+            slots = 0,
+            total = 0,
+            by_name = {},
+        }
     end
+
     local slots_used = 0
     local total_items = 0
+    local by_name = {}
     for _, stack in pairs(inv.list()) do
         slots_used = slots_used + 1
         total_items = total_items + stack.count
+        by_name[stack.name] = (by_name[stack.name] or 0) + stack.count
     end
-    return true, slots_used, total_items
+
+    return {
+        ok = true,
+        slots = slots_used,
+        total = total_items,
+        by_name = by_name,
+    }
+end
+
+local function top_items_text(status, max_items)
+    if not status.ok then
+        return "n/a"
+    end
+
+    local names = {}
+    for item_name, _ in pairs(status.by_name) do
+        names[#names + 1] = item_name
+    end
+    table.sort(names)
+
+    if #names == 0 then
+        return "(empty)"
+    end
+
+    local parts = {}
+    local limit = math.min(#names, max_items)
+    for i = 1, limit do
+        local name = names[i]
+        parts[#parts + 1] = ("%s:%d"):format(name, status.by_name[name])
+    end
+    if #names > max_items then
+        parts[#parts + 1] = ("... +%d more"):format(#names - max_items)
+    end
+    return table.concat(parts, " | ")
 end
 
 local function bool_text(v)
@@ -64,10 +105,10 @@ local function bool_text(v)
 end
 
 local function sample_status()
-    local ext_ok, ext_slots, ext_total = inventory_counts(config.EXTERNAL_INPUT_CONTAINER)
-    local int_ok, int_slots, int_total = inventory_counts(config.INTERNAL_STORAGE_CONTAINER)
-    local bus_ok, bus_slots, bus_total = inventory_counts(config.CRUCIBLE_INPUT_BUS)
-    local out_ok, out_slots, out_total = inventory_counts(config.OUTPUT_CONTAINER)
+    local ext = inventory_status(config.EXTERNAL_INPUT_CONTAINER)
+    local int = inventory_status(config.INTERNAL_STORAGE_CONTAINER)
+    local bus = inventory_status(config.CRUCIBLE_INPUT_BUS)
+    local out = inventory_status(config.OUTPUT_CONTAINER)
 
     local chroma_signal = read_analog_input(config.DEFAULT_CHROMA_SENSOR_SIDE)
     local chroma_color = utils.decode_chroma_sensor_signal(chroma_signal)
@@ -76,18 +117,10 @@ local function sample_status()
 
     return {
         monitor_ok = monitor ~= nil,
-        ext_ok = ext_ok,
-        ext_slots = ext_slots,
-        ext_total = ext_total,
-        int_ok = int_ok,
-        int_slots = int_slots,
-        int_total = int_total,
-        bus_ok = bus_ok,
-        bus_slots = bus_slots,
-        bus_total = bus_total,
-        out_ok = out_ok,
-        out_slots = out_slots,
-        out_total = out_total,
+        ext = ext,
+        int = int,
+        bus = bus,
+        out = out,
         chroma_signal = chroma_signal,
         chroma_color = chroma_color or "invalid",
         working_signal = working_signal,
@@ -98,10 +131,10 @@ end
 local function serialize_status(s)
     return table.concat({
         tostring(s.monitor_ok),
-        tostring(s.ext_ok), tostring(s.ext_slots), tostring(s.ext_total),
-        tostring(s.int_ok), tostring(s.int_slots), tostring(s.int_total),
-        tostring(s.bus_ok), tostring(s.bus_slots), tostring(s.bus_total),
-        tostring(s.out_ok), tostring(s.out_slots), tostring(s.out_total),
+        tostring(s.ext.ok), tostring(s.ext.slots), tostring(s.ext.total), top_items_text(s.ext, 32),
+        tostring(s.int.ok), tostring(s.int.slots), tostring(s.int.total), top_items_text(s.int, 32),
+        tostring(s.bus.ok), tostring(s.bus.slots), tostring(s.bus.total), top_items_text(s.bus, 32),
+        tostring(s.out.ok), tostring(s.out.slots), tostring(s.out.total), top_items_text(s.out, 32),
         tostring(s.chroma_signal), tostring(s.chroma_color),
         tostring(s.working_signal), tostring(s.trigger_signal),
     }, "|")
@@ -127,10 +160,14 @@ while true do
         ("last change: %.1fs ago"):format(os.clock() - last_change),
         "",
         ("monitor(%s): %s"):format(tostring(config.STATUS_MONITOR), bool_text(s.monitor_ok)),
-        ("external(%s): %s slots=%d items=%d"):format(config.EXTERNAL_INPUT_CONTAINER, bool_text(s.ext_ok), s.ext_slots, s.ext_total),
-        ("internal(%s): %s slots=%d items=%d"):format(config.INTERNAL_STORAGE_CONTAINER, bool_text(s.int_ok), s.int_slots, s.int_total),
-        ("inputbus(%s): %s slots=%d items=%d"):format(config.CRUCIBLE_INPUT_BUS, bool_text(s.bus_ok), s.bus_slots, s.bus_total),
-        ("output(%s): %s slots=%d items=%d"):format(config.OUTPUT_CONTAINER, bool_text(s.out_ok), s.out_slots, s.out_total),
+        ("external(%s): %s slots=%d items=%d"):format(config.EXTERNAL_INPUT_CONTAINER, bool_text(s.ext.ok), s.ext.slots, s.ext.total),
+        ("  ids/counts: %s"):format(top_items_text(s.ext, 4)),
+        ("internal(%s): %s slots=%d items=%d"):format(config.INTERNAL_STORAGE_CONTAINER, bool_text(s.int.ok), s.int.slots, s.int.total),
+        ("  ids/counts: %s"):format(top_items_text(s.int, 4)),
+        ("inputbus(%s): %s slots=%d items=%d"):format(config.CRUCIBLE_INPUT_BUS, bool_text(s.bus.ok), s.bus.slots, s.bus.total),
+        ("  ids/counts: %s"):format(top_items_text(s.bus, 4)),
+        ("output(%s): %s slots=%d items=%d"):format(config.OUTPUT_CONTAINER, bool_text(s.out.ok), s.out.slots, s.out.total),
+        ("  ids/counts: %s"):format(top_items_text(s.out, 4)),
         "",
         ("chroma side=%s  signal=%d  color=%s"):format(config.DEFAULT_CHROMA_SENSOR_SIDE, s.chroma_signal, s.chroma_color),
         ("working side=%s signal=%d  state=%s"):format(
