@@ -1,7 +1,7 @@
 local running_program = shell and shell.getRunningProgram and shell.getRunningProgram() or "tests/test_status_monitor.lua"
 local project_root = fs.combine(fs.getDir(running_program), "..")
 
-local config = dofile(fs.combine(project_root, "config.lua"))
+local config = dofile(fs.combine(project_root, "config_transcendence.lua"))
 _G.PRISMATIC_CONFIG = config
 local utils = dofile(fs.combine(project_root, "utils.lua"))
 

@@ -50,7 +50,7 @@ local old_sleep = sleep
 local old_config = rawget(_G, "PRISMATIC_CONFIG")
 local old_utils = rawget(_G, "PRISMATIC_UTILS")
 
-local config = dofile(fs.combine(project_root, "config.lua"))
+local config = dofile(fs.combine(project_root, "config_transcendence.lua"))
 _G.PRISMATIC_CONFIG = config
 local utils = dofile(fs.combine(project_root, "utils.lua"))
 _G.PRISMATIC_UTILS = utils

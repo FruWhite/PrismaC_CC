@@ -1,6 +1,6 @@
 local running_program = shell and shell.getRunningProgram and shell.getRunningProgram() or "tests/test_utils_read_crucible_color.lua"
 local project_root = fs.combine(fs.getDir(running_program), "..")
-_G.PRISMATIC_CONFIG = dofile(fs.combine(project_root, "config.lua"))
+_G.PRISMATIC_CONFIG = dofile(fs.combine(project_root, "config_transcendence.lua"))
 local utils_path = fs.combine(project_root, "utils.lua")
 local utils = dofile(utils_path)
 

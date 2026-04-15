@@ -14,7 +14,7 @@ end
 
 local config = rawget(_G, "PRISMATIC_CONFIG")
 if not config then
-    config = load_local("config.lua")
+    config = load_local("config_transcendence.lua")
 end
 
 M.DEFAULT_CHROMA_SENSOR_SIDE = config.DEFAULT_CHROMA_SENSOR_SIDE

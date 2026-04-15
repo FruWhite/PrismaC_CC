@@ -1,4 +1,4 @@
-local running_program = shell and shell.getRunningProgram and shell.getRunningProgram() or "main.lua"
+local running_program = shell and shell.getRunningProgram and shell.getRunningProgram() or "main_transcendence.lua"
 local base_dir = fs.getDir(running_program)
 _G.PRISMATIC_BASE_DIR = base_dir
 
@@ -9,7 +9,7 @@ local function load_local(name)
     return dofile(name)
 end
 
-local config = load_local("config.lua")
+local config = load_local("config_transcendence.lua")
 _G.PRISMATIC_CONFIG = config
 
 local utils = load_local("utils.lua")

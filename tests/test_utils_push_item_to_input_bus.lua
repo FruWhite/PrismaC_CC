@@ -1,6 +1,6 @@
 local running_program = shell and shell.getRunningProgram and shell.getRunningProgram() or "tests/test_utils_push_item_to_input_bus.lua"
 local project_root = fs.combine(fs.getDir(running_program), "..")
-_G.PRISMATIC_CONFIG = dofile(fs.combine(project_root, "config.lua"))
+_G.PRISMATIC_CONFIG = dofile(fs.combine(project_root, "config_transcendence.lua"))
 local utils = dofile(fs.combine(project_root, "utils.lua"))
 
 local function assert_eq(actual, expected, message)
