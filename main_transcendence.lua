@@ -17,6 +17,7 @@ _G.PRISMATIC_UTILS = utils
 
 local active_core = load_local("active_core.lua")
 local supercritical_core = load_local("supercritical_core.lua")
+local nullify = load_local("nullify.lua")
 
 local CHECK_INTERVAL = config.BUS_CHECK_INTERVAL_SECONDS or 0.1
 
@@ -28,6 +29,10 @@ local REQUIRED_ACTIVE_TRIGGER_INPUT = {
 local REQUIRED_SUPER_TRIGGER_INPUT = {
     ["kubejs:inert_prismatic_core"] = 1,
     ["kubejs:chromatic_stabilizer"] = 3,
+}
+
+local REQUIRED_NULLIFY_TRIGGER_INPUT = {
+    ["kubejs:supercritical_prismatic_core"] = 1,
 }
 
 local state = {
@@ -317,6 +322,37 @@ local function run_once_if_ready(active_input, super_input)
         return
     end
 
+    if super_has_any and has_required_batch(super_input, REQUIRED_NULLIFY_TRIGGER_INPUT) then
+        state.loop_status = "importing nullify batch"
+        local moved, move_err = import_batch_to_internal(super_input, REQUIRED_NULLIFY_TRIGGER_INPUT)
+        if not moved then
+            state.last_error = "Nullify import failed: " .. tostring(move_err)
+            state.loop_status = "import failed"
+            return
+        end
+
+        state.last_error = nil
+        state.loop_status = "running nullify cycle"
+        local ok, cycle_err = nullify.run_nullify_cycle(function(payload)
+            update_craft_state(payload)
+            render_status()
+        end)
+        if not ok then
+            state.last_error = "Nullify cycle failed: " .. tostring(cycle_err)
+            state.loop_status = "cycle failed"
+            return
+        end
+
+        state.last_error = nil
+        state.loop_status = "nullify cycle complete"
+        update_craft_state({
+            phase = "done",
+            message = "Nullify cycle complete",
+            waiting_for = {},
+        })
+        return
+    end
+
     if super_has_any and has_required_batch(super_input, REQUIRED_SUPER_TRIGGER_INPUT) then
         state.loop_status = "importing supercritical batch"
         local moved, move_err = import_batch_to_internal(super_input, REQUIRED_SUPER_TRIGGER_INPUT)
@@ -382,7 +418,7 @@ local function run_once_if_ready(active_input, super_input)
     state.loop_status = "waiting complete input batch"
     update_craft_state({
         phase = "idle",
-        message = "Need active(inert x1 + stab x3) or super(inert x1 + stab x3)",
+        message = "Need active(inert x1 + stab x3), super(inert x1 + stab x3), or supercritical x1(nullify)",
         waiting_for = {},
     })
 end
@@ -397,34 +433,31 @@ local function main()
         error(("peripheral '%s' cannot push items (missing pushItems method)"):format(config.SUPERCRITICAL_CORE_INPUT_CONTAINER), 2)
     end
 
-    local was_on = is_trigger_on()
-    state.loop_status = "waiting trigger"
+    local active_mode = is_trigger_on()
+    state.loop_status = active_mode and "wake" or "sleep"
     render_status()
 
-    if was_on then
-        run_once_if_ready(active_input, super_input)
-        render_status()
-    end
-
-    local timer_id = os.startTimer(CHECK_INTERVAL)
     while true do
-        local event = { os.pullEvent() }
-        if event[1] == "redstone" then
-            local is_on = is_trigger_on()
-            if is_on and not was_on then
-                run_once_if_ready(active_input, super_input)
+        if not active_mode then
+            -- Sleep mode: wait only for rising edge.
+            local event = { os.pullEvent("redstone") }
+            if event[1] == "redstone" and is_trigger_on() then
+                active_mode = true
+                state.loop_status = "wake"
+                render_status()
             end
-            was_on = is_on
-            state.loop_status = "waiting trigger"
+        else
+            -- Wake mode: keep checking input and crafting while trigger stays ON.
+            run_once_if_ready(active_input, super_input)
             render_status()
-        elseif event[1] == "timer" and event[2] == timer_id then
-            if is_trigger_on() then
-                run_once_if_ready(active_input, super_input)
+
+            if not is_trigger_on() then
+                active_mode = false
+                state.loop_status = "sleep"
+                render_status()
             else
-                state.loop_status = "waiting trigger"
+                sleep(CHECK_INTERVAL)
             end
-            render_status()
-            timer_id = os.startTimer(CHECK_INTERVAL)
         end
     end
 end
