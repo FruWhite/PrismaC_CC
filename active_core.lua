@@ -25,15 +25,15 @@ local M = {}
 local FINAL_COLOR_SETTLE_SECONDS = 2.0
 
 local ACTIVE_CORE_SEQUENCE = {
-    { item = "kubejs:inert_prismatic_core", color = "red" },
-    { item = "kubejs:yellow_prismatic_core", color = "green" },
-    { item = "kubejs:cyan_prismatic_core", color = "blue" },
-    { item = "kubejs:chromatic_stabilizer", color = "red" },
     { item = "kubejs:blue_prismatic_core", color = "magenta" },
     { item = "kubejs:chromatic_stabilizer", color = "blue" },
     { item = "kubejs:green_prismatic_core", color = "cyan" },
     { item = "kubejs:chromatic_stabilizer", color = "green" },
     { item = "kubejs:red_prismatic_core", color = "yellow" },
+    { item = "kubejs:inert_prismatic_core", color = "red" },
+    { item = "kubejs:yellow_prismatic_core", color = "green" },
+    { item = "kubejs:cyan_prismatic_core", color = "blue" },
+    { item = "kubejs:chromatic_stabilizer", color = "red" },
 }
 
 local function get_inventory(name)
@@ -177,12 +177,12 @@ function M.run_active_core_cycle(on_status)
     local settle_deadline = os.clock() + FINAL_COLOR_SETTLE_SECONDS
     while true do
         final_color, _, final_err = utils.read_crucible_color()
-        if final_color == "red" then
+        if final_color == "magenta" then
             break
         end
         if os.clock() >= settle_deadline then
             if final_color then
-                return nil, ("cycle finished on '%s' instead of 'red'"):format(final_color)
+                return nil, ("cycle finished on '%s' instead of 'magenta'"):format(final_color)
             end
             return nil, final_err
         end
@@ -191,7 +191,7 @@ function M.run_active_core_cycle(on_status)
             phase = "final_color_settle",
             current_step = nil,
             last_step = last_step,
-            waiting_for = { "crucible final color red" },
+            waiting_for = { "crucible final color magenta" },
             current_color = final_color,
             message = "Waiting for final color settle",
         })

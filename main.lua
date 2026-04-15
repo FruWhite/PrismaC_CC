@@ -16,10 +16,16 @@ local utils = load_local("utils.lua")
 _G.PRISMATIC_UTILS = utils
 
 local active_core = load_local("active_core.lua")
+local supercritical_core = load_local("supercritical_core.lua")
 
 local CHECK_INTERVAL = config.BUS_CHECK_INTERVAL_SECONDS or 0.1
 
-local REQUIRED_EXTERNAL_INPUT = {
+local REQUIRED_ACTIVE_TRIGGER_INPUT = {
+    ["kubejs:inert_prismatic_core"] = 1,
+    ["kubejs:chromatic_stabilizer"] = 3,
+}
+
+local REQUIRED_SUPER_TRIGGER_INPUT = {
     ["kubejs:inert_prismatic_core"] = 1,
     ["kubejs:chromatic_stabilizer"] = 3,
 }
@@ -166,9 +172,9 @@ local function count_item_in_inventory(inv, item_name)
     return total
 end
 
-local function external_has_required_batch(external_input)
-    for item_name, needed in pairs(REQUIRED_EXTERNAL_INPUT) do
-        if count_item_in_inventory(external_input, item_name) < needed then
+local function has_required_batch(container, requirements)
+    for item_name, needed in pairs(requirements) do
+        if count_item_in_inventory(container, item_name) < needed then
             return false
         end
     end
@@ -195,10 +201,10 @@ local function move_item_amount_by_name(source_inv, target_name, item_name, amou
     return true
 end
 
-local function import_external_batch_to_internal(external_input)
-    for item_name, needed in pairs(REQUIRED_EXTERNAL_INPUT) do
+local function import_batch_to_internal(source_input, requirements)
+    for item_name, needed in pairs(requirements) do
         local ok, err = move_item_amount_by_name(
-            external_input,
+            source_input,
             config.INTERNAL_STORAGE_CONTAINER,
             item_name,
             needed
@@ -225,7 +231,8 @@ local function update_craft_state(payload)
 end
 
 local function render_status()
-    local ext = inventory_status(config.EXTERNAL_INPUT_CONTAINER)
+    local ext = inventory_status(config.ACTIVE_CORE_INPUT_CONTAINER)
+    local sup = inventory_status(config.SUPERCRITICAL_CORE_INPUT_CONTAINER)
     local int = inventory_status(config.INTERNAL_STORAGE_CONTAINER)
     local bus = inventory_status(config.CRUCIBLE_INPUT_BUS)
     local out = inventory_status(config.OUTPUT_CONTAINER)
@@ -249,8 +256,15 @@ local function render_status()
         ("error: %s"):format(state.last_error or "none"),
         "",
         ("monitor(%s): %s"):format(tostring(config.STATUS_MONITOR), bool_text(monitor ~= nil)),
-        ("external(%s): %s slots=%d items=%d"):format(config.EXTERNAL_INPUT_CONTAINER, bool_text(ext.ok), ext.slots, ext.total),
+        ("active-in(%s): %s slots=%d items=%d"):format(config.ACTIVE_CORE_INPUT_CONTAINER, bool_text(ext.ok), ext.slots, ext.total),
         ("  ids/counts: %s"):format(top_items_text(ext, 3)),
+        ("super-in(%s): %s slots=%d items=%d"):format(
+            config.SUPERCRITICAL_CORE_INPUT_CONTAINER,
+            bool_text(sup.ok),
+            sup.slots,
+            sup.total
+        ),
+        ("  ids/counts: %s"):format(top_items_text(sup, 3)),
         ("internal(%s): %s slots=%d items=%d"):format(config.INTERNAL_STORAGE_CONTAINER, bool_text(int.ok), int.slots, int.total),
         ("  ids/counts: %s"):format(top_items_text(int, 3)),
         ("inputbus(%s): %s slots=%d items=%d"):format(config.CRUCIBLE_INPUT_BUS, bool_text(bus.ok), bus.slots, bus.total),
@@ -290,61 +304,97 @@ local function render_status()
     write_lines(lines)
 end
 
-local function run_once_if_ready(external_input)
-    local has_any_input = next(external_input.list()) ~= nil
-    if not has_any_input then
-        state.loop_status = "waiting external input"
+local function run_once_if_ready(active_input, super_input)
+    local active_has_any = next(active_input.list()) ~= nil
+    local super_has_any = next(super_input.list()) ~= nil
+    if not active_has_any and not super_has_any then
+        state.loop_status = "waiting input"
         update_craft_state({
             phase = "idle",
-            message = "No external items",
+            message = "No input items",
             waiting_for = {},
         })
         return
     end
 
-    if not external_has_required_batch(external_input) then
-        state.loop_status = "waiting external batch"
+    if super_has_any and has_required_batch(super_input, REQUIRED_SUPER_TRIGGER_INPUT) then
+        state.loop_status = "importing supercritical batch"
+        local moved, move_err = import_batch_to_internal(super_input, REQUIRED_SUPER_TRIGGER_INPUT)
+        if not moved then
+            state.last_error = "Super import failed: " .. tostring(move_err)
+            state.loop_status = "import failed"
+            return
+        end
+
+        state.last_error = nil
+        state.loop_status = "running supercritical cycle"
+        local ok, cycle_err = supercritical_core.run_supercritical_core_cycle(function(payload)
+            update_craft_state(payload)
+            render_status()
+        end)
+        if not ok then
+            state.last_error = "Supercritical cycle failed: " .. tostring(cycle_err)
+            state.loop_status = "cycle failed"
+            return
+        end
+
+        state.last_error = nil
+        state.loop_status = "supercritical cycle complete"
         update_craft_state({
-            phase = "idle",
-            message = "Need inert x1 + stabilizer x3 in external input",
+            phase = "done",
+            message = "Supercritical cycle complete",
             waiting_for = {},
         })
         return
     end
 
-    state.loop_status = "importing batch"
-    local moved, move_err = import_external_batch_to_internal(external_input)
-    if not moved then
-        state.last_error = "Import failed: " .. tostring(move_err)
-        state.loop_status = "import failed"
+    if active_has_any and has_required_batch(active_input, REQUIRED_ACTIVE_TRIGGER_INPUT) then
+        state.loop_status = "importing active batch"
+        local moved, move_err = import_batch_to_internal(active_input, REQUIRED_ACTIVE_TRIGGER_INPUT)
+        if not moved then
+            state.last_error = "Active import failed: " .. tostring(move_err)
+            state.loop_status = "import failed"
+            return
+        end
+
+        state.last_error = nil
+        state.loop_status = "running active core cycle"
+        local ok, cycle_err = active_core.run_active_core_cycle(function(payload)
+            update_craft_state(payload)
+            render_status()
+        end)
+        if not ok then
+            state.last_error = "Active core cycle failed: " .. tostring(cycle_err)
+            state.loop_status = "cycle failed"
+            return
+        end
+
+        state.last_error = nil
+        state.loop_status = "active cycle complete"
+        update_craft_state({
+            phase = "done",
+            message = "Active core cycle complete",
+            waiting_for = {},
+        })
         return
     end
 
-    state.last_error = nil
-    state.loop_status = "running active core cycle"
-    local ok, cycle_err = active_core.run_active_core_cycle(function(payload)
-        update_craft_state(payload)
-        render_status()
-    end)
-    if not ok then
-        state.last_error = "Active core cycle failed: " .. tostring(cycle_err)
-        state.loop_status = "cycle failed"
-        return
-    end
-
-    state.last_error = nil
-    state.loop_status = "cycle complete"
+    state.loop_status = "waiting complete input batch"
     update_craft_state({
-        phase = "done",
-        message = "Active core cycle complete",
+        phase = "idle",
+        message = "Need active(inert x1 + stab x3) or super(inert x1 + stab x3)",
         waiting_for = {},
     })
 end
 
 local function main()
-    local external_input = get_inventory(config.EXTERNAL_INPUT_CONTAINER)
-    if type(external_input.pushItems) ~= "function" then
-        error(("peripheral '%s' cannot push items (missing pushItems method)"):format(config.EXTERNAL_INPUT_CONTAINER), 2)
+    local active_input = get_inventory(config.ACTIVE_CORE_INPUT_CONTAINER)
+    local super_input = get_inventory(config.SUPERCRITICAL_CORE_INPUT_CONTAINER)
+    if type(active_input.pushItems) ~= "function" then
+        error(("peripheral '%s' cannot push items (missing pushItems method)"):format(config.ACTIVE_CORE_INPUT_CONTAINER), 2)
+    end
+    if type(super_input.pushItems) ~= "function" then
+        error(("peripheral '%s' cannot push items (missing pushItems method)"):format(config.SUPERCRITICAL_CORE_INPUT_CONTAINER), 2)
     end
 
     local was_on = is_trigger_on()
@@ -352,7 +402,7 @@ local function main()
     render_status()
 
     if was_on then
-        run_once_if_ready(external_input)
+        run_once_if_ready(active_input, super_input)
         render_status()
     end
 
@@ -362,12 +412,17 @@ local function main()
         if event[1] == "redstone" then
             local is_on = is_trigger_on()
             if is_on and not was_on then
-                run_once_if_ready(external_input)
+                run_once_if_ready(active_input, super_input)
             end
             was_on = is_on
             state.loop_status = "waiting trigger"
             render_status()
         elseif event[1] == "timer" and event[2] == timer_id then
+            if is_trigger_on() then
+                run_once_if_ready(active_input, super_input)
+            else
+                state.loop_status = "waiting trigger"
+            end
             render_status()
             timer_id = os.startTimer(CHECK_INTERVAL)
         end

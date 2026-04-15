@@ -105,7 +105,8 @@ local function bool_text(v)
 end
 
 local function sample_status()
-    local ext = inventory_status(config.EXTERNAL_INPUT_CONTAINER)
+    local ext = inventory_status(config.ACTIVE_CORE_INPUT_CONTAINER)
+    local sup = inventory_status(config.SUPERCRITICAL_CORE_INPUT_CONTAINER)
     local int = inventory_status(config.INTERNAL_STORAGE_CONTAINER)
     local bus = inventory_status(config.CRUCIBLE_INPUT_BUS)
     local out = inventory_status(config.OUTPUT_CONTAINER)
@@ -118,6 +119,7 @@ local function sample_status()
     return {
         monitor_ok = monitor ~= nil,
         ext = ext,
+        sup = sup,
         int = int,
         bus = bus,
         out = out,
@@ -132,6 +134,7 @@ local function serialize_status(s)
     return table.concat({
         tostring(s.monitor_ok),
         tostring(s.ext.ok), tostring(s.ext.slots), tostring(s.ext.total), top_items_text(s.ext, 32),
+        tostring(s.sup.ok), tostring(s.sup.slots), tostring(s.sup.total), top_items_text(s.sup, 32),
         tostring(s.int.ok), tostring(s.int.slots), tostring(s.int.total), top_items_text(s.int, 32),
         tostring(s.bus.ok), tostring(s.bus.slots), tostring(s.bus.total), top_items_text(s.bus, 32),
         tostring(s.out.ok), tostring(s.out.slots), tostring(s.out.total), top_items_text(s.out, 32),
@@ -160,8 +163,10 @@ while true do
         ("last change: %.1fs ago"):format(os.clock() - last_change),
         "",
         ("monitor(%s): %s"):format(tostring(config.STATUS_MONITOR), bool_text(s.monitor_ok)),
-        ("external(%s): %s slots=%d items=%d"):format(config.EXTERNAL_INPUT_CONTAINER, bool_text(s.ext.ok), s.ext.slots, s.ext.total),
+        ("active-in(%s): %s slots=%d items=%d"):format(config.ACTIVE_CORE_INPUT_CONTAINER, bool_text(s.ext.ok), s.ext.slots, s.ext.total),
         ("  ids/counts: %s"):format(top_items_text(s.ext, 4)),
+        ("super-in(%s): %s slots=%d items=%d"):format(config.SUPERCRITICAL_CORE_INPUT_CONTAINER, bool_text(s.sup.ok), s.sup.slots, s.sup.total),
+        ("  ids/counts: %s"):format(top_items_text(s.sup, 4)),
         ("internal(%s): %s slots=%d items=%d"):format(config.INTERNAL_STORAGE_CONTAINER, bool_text(s.int.ok), s.int.slots, s.int.total),
         ("  ids/counts: %s"):format(top_items_text(s.int, 4)),
         ("inputbus(%s): %s slots=%d items=%d"):format(config.CRUCIBLE_INPUT_BUS, bool_text(s.bus.ok), s.bus.slots, s.bus.total),
