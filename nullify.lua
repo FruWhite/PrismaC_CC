@@ -27,12 +27,6 @@ local NULLIFY_REQUIREMENTS = {
     ["kubejs:supercritical_prismatic_core"] = 1,
 }
 
-local function emit_status(cb, payload)
-    if cb then
-        cb(payload)
-    end
-end
-
 local function read_required_color()
     local color, _, err = utils.read_crucible_color()
     if not color then
@@ -42,18 +36,11 @@ local function read_required_color()
 end
 
 function M.run_nullify_cycle(on_status)
-    emit_status(on_status, {
-        phase = "precheck",
-        message = "Checking nullify ingredient availability",
-    })
-
-    local ready, missing = utils.has_required_items_in_internal_storage(NULLIFY_REQUIREMENTS)
-    emit_status(on_status, {
-        phase = "precheck",
-        ingredients_ready = ready,
-        missing = missing,
-        message = ready and "Ingredients ready" or "Ingredients missing",
-    })
+    local ready, missing = utils.check_cycle_requirements(
+        NULLIFY_REQUIREMENTS,
+        on_status,
+        "Checking nullify ingredient availability"
+    )
     if not ready then
         return nil, missing
     end
@@ -65,7 +52,7 @@ function M.run_nullify_cycle(on_status)
 
     local step_label = "supercritical core -> liquid null"
     local ok, err = utils.push_item_to_input_bus("kubejs:supercritical_prismatic_core", required_color, function(readiness)
-        emit_status(on_status, {
+        utils.emit_status(on_status, {
             phase = "step_wait",
             current_step = step_label,
             waiting_for = readiness.waiting_for,
@@ -77,14 +64,14 @@ function M.run_nullify_cycle(on_status)
         return nil, err
     end
 
-    emit_status(on_status, {
+    utils.emit_status(on_status, {
         phase = "step_done",
         current_step = nil,
         last_step = step_label,
         message = "Nullify step submitted",
     })
 
-    emit_status(on_status, {
+    utils.emit_status(on_status, {
         phase = "done",
         current_step = nil,
         last_step = step_label,
