@@ -52,7 +52,12 @@ end
 
 local STATUS_SECTIONS = {
     { label = "input", name = config.INPUT_CONTAINER, max_items = 4 },
-    { label = "internal", name = config.INTERNAL_STORAGE_CONTAINER, max_items = 4 },
+    {
+        label = "internal",
+        name = config.INTERNAL_STORAGE_CONTAINER,
+        max_items = 4,
+        detail_builder = utils.format_processing_internal,
+    },
     { label = "inputbus", name = config.CRUCIBLE_INPUT_BUS, max_items = 4 },
     { label = "output", name = config.OUTPUT_CONTAINER, max_items = 4 },
 }

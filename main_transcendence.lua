@@ -60,7 +60,12 @@ end
 local STATUS_SECTIONS = {
     { label = "active-in", name = config.ACTIVE_CORE_INPUT_CONTAINER, max_items = 3 },
     { label = "super-in", name = config.SUPERCRITICAL_CORE_INPUT_CONTAINER, max_items = 3 },
-    { label = "internal", name = config.INTERNAL_STORAGE_CONTAINER, max_items = 3 },
+    {
+        label = "internal",
+        name = config.INTERNAL_STORAGE_CONTAINER,
+        max_items = 3,
+        detail_builder = utils.format_transcendence_internal,
+    },
     { label = "inputbus", name = config.CRUCIBLE_INPUT_BUS, max_items = 3 },
     { label = "output", name = config.OUTPUT_CONTAINER, max_items = 3 },
 }

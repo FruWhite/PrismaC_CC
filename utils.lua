@@ -206,6 +206,111 @@ function M.top_items_text(status, max_items)
     return table.concat(parts, " | ")
 end
 
+local PRISMATIC_COLOR_ORDER = {
+    "red", "orange", "yellow", "lime", "green", "teal",
+    "cyan", "azure", "blue", "indigo", "magenta", "pink",
+}
+
+local function join_count_parts(parts)
+    if #parts == 0 then
+        return "none"
+    end
+    return table.concat(parts, "; ")
+end
+
+local function count_parts_in_order(order, counts)
+    local parts = {}
+    for _, key in ipairs(order) do
+        local amount = counts[key]
+        if amount and amount > 0 then
+            parts[#parts + 1] = ("%s %d"):format(key, amount)
+        end
+    end
+    return parts
+end
+
+function M.format_transcendence_internal(status)
+    local by_name = status.by_name or {}
+    local core_counts = { inert = 0 }
+    local capacitor_counts = { empty = 0 }
+    local stabilizers = 0
+
+    for item_name, amount in pairs(by_name) do
+        if item_name == "kubejs:chromatic_stabilizer" then
+            stabilizers = stabilizers + amount
+        elseif item_name == "kubejs:inert_prismatic_core" then
+            core_counts.inert = core_counts.inert + amount
+        else
+            local core_name = item_name:match("^kubejs:([a-z_]+)_prismatic_core$")
+            if core_name then
+                core_counts[core_name] = (core_counts[core_name] or 0) + amount
+            else
+                local cap_name = item_name:match("^kubejs:chromatic_capacitor_([a-z_]+)$")
+                if cap_name then
+                    if cap_name == "empty" then
+                        capacitor_counts.empty = (capacitor_counts.empty or 0) + amount
+                    else
+                        capacitor_counts[cap_name] = (capacitor_counts[cap_name] or 0) + amount
+                    end
+                end
+            end
+        end
+    end
+
+    local core_order_line_1 = { "inert", "red", "orange", "yellow", "lime", "green", "teal" }
+    local core_order_line_2 = { "cyan", "azure", "blue", "indigo", "magenta", "pink", "active", "supercritical" }
+
+    local capacitor_order = { "empty" }
+    for _, color in ipairs(PRISMATIC_COLOR_ORDER) do
+        capacitor_order[#capacitor_order + 1] = color
+    end
+
+    local core_parts_1 = count_parts_in_order(core_order_line_1, core_counts)
+    local core_parts_2 = count_parts_in_order(core_order_line_2, core_counts)
+    local capacitor_parts = count_parts_in_order(capacitor_order, capacitor_counts)
+
+    local lines = {
+        ("  cores: %s"):format(join_count_parts(core_parts_1)),
+    }
+    if #core_parts_2 > 0 then
+        lines[#lines + 1] = ("         %s"):format(join_count_parts(core_parts_2))
+    end
+    lines[#lines + 1] = ("  stabilizers: %d"):format(stabilizers)
+    lines[#lines + 1] = ("  capacitors: %s"):format(join_count_parts(capacitor_parts))
+    return lines
+end
+
+function M.format_processing_internal(status)
+    local by_name = status.by_name or {}
+    local glass_counts = {}
+    local psoc_counts = {}
+
+    for item_name, amount in pairs(by_name) do
+        local glass_name = item_name:match("^kubejs:([a-z_]+)_aligned_glass$")
+        if glass_name then
+            glass_counts[glass_name] = (glass_counts[glass_name] or 0) + amount
+        elseif item_name == "kubejs:lyso_ce_glass" then
+            glass_counts.lyso = (glass_counts.lyso or 0) + amount
+        else
+            local psoc_name = item_name:match("^kubejs:photonic_soc_([a-z_]+)$")
+            if psoc_name then
+                psoc_counts[psoc_name] = (psoc_counts[psoc_name] or 0) + amount
+            end
+        end
+    end
+
+    local glass_order = { "lyso", "red", "yellow", "green", "cyan", "blue", "magenta" }
+    local psoc_order = { "inert", "red", "yellow", "green", "cyan", "blue", "magenta", "active" }
+
+    local glass_parts = count_parts_in_order(glass_order, glass_counts)
+    local psoc_parts = count_parts_in_order(psoc_order, psoc_counts)
+
+    return {
+        ("  glass: %s"):format(join_count_parts(glass_parts)),
+        ("  psoc: %s"):format(join_count_parts(psoc_parts)),
+    }
+end
+
 function M.bool_text(v)
     if v then
         return "OK"
@@ -343,7 +448,16 @@ function M.render_status(opts)
                 status.total
             )
         )
-        section_lines[#section_lines + 1] = ("  ids/counts: %s"):format(M.top_items_text(status, max_items))
+        if type(section.detail_builder) == "function" then
+            local detail_lines = section.detail_builder(status, section)
+            if type(detail_lines) == "table" then
+                for _, detail in ipairs(detail_lines) do
+                    section_lines[#section_lines + 1] = tostring(detail)
+                end
+            end
+        else
+            section_lines[#section_lines + 1] = ("  ids/counts: %s"):format(M.top_items_text(status, max_items))
+        end
     end
 
     local chroma_signal = M.read_analog_input(config.DEFAULT_CHROMA_SENSOR_SIDE)
