@@ -114,7 +114,7 @@ local function sample_status()
     local chroma_signal = read_analog_input(config.DEFAULT_CHROMA_SENSOR_SIDE)
     local chroma_color = utils.decode_chroma_sensor_signal(chroma_signal)
     local working_signal = read_analog_input(config.CRUCIBLE_WORKING_SIGNAL_SIDE)
-    local trigger_signal = read_analog_input(config.AE2_CRAFT_TRIGGER_SIDE)
+    local trigger_signal = read_analog_input(config.AE2_CRAFT_EMITTER_SIDE)
 
     return {
         monitor_ok = monitor ~= nil,
@@ -181,7 +181,7 @@ while true do
             s.working_signal > 0 and "WORKING" or "IDLE"
         ),
         ("trigger side=%s signal=%d  state=%s"):format(
-            config.AE2_CRAFT_TRIGGER_SIDE,
+            config.AE2_CRAFT_EMITTER_SIDE,
             s.trigger_signal,
             s.trigger_signal > 0 and "ON" or "OFF"
         ),

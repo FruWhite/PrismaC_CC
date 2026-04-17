@@ -463,7 +463,7 @@ function M.render_status(opts)
     local chroma_signal = M.read_analog_input(config.DEFAULT_CHROMA_SENSOR_SIDE)
     local chroma_color = M.decode_chroma_sensor_signal(chroma_signal) or "invalid"
     local working_signal = M.read_analog_input(config.CRUCIBLE_WORKING_SIGNAL_SIDE)
-    local trigger_signal = M.read_analog_input(config.AE2_CRAFT_TRIGGER_SIDE)
+    local trigger_signal = M.read_analog_input(config.AE2_CRAFT_EMITTER_SIDE)
 
     local waiting_for = state.craft and state.craft.waiting_for
     local waiting_text = "none"
@@ -493,7 +493,7 @@ function M.render_status(opts)
         working_signal > 0 and "WORKING" or "IDLE"
     )
     lines[#lines + 1] = ("trigger side=%s signal=%d  state=%s"):format(
-        config.AE2_CRAFT_TRIGGER_SIDE,
+        config.AE2_CRAFT_EMITTER_SIDE,
         trigger_signal,
         trigger_signal > 0 and "ON" or "OFF"
     )

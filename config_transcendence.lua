@@ -3,7 +3,7 @@ local CONFIG = {}
 CONFIG.DEFAULT_CHROMA_SENSOR_SIDE = "bottom"
 CONFIG.CRUCIBLE_WORKING_SIGNAL_SIDE = "left"
 CONFIG.BUS_CHECK_INTERVAL_SECONDS = 0.1
-CONFIG.AE2_CRAFT_TRIGGER_SIDE = "right"
+CONFIG.AE2_CRAFT_EMITTER_SIDE = "right"
 
 -- Peripheral names (edit to match your world/wired modem names).
 CONFIG.ACTIVE_CORE_INPUT_CONTAINER = "minecraft:barrel_2"

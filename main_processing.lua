@@ -167,7 +167,7 @@ local function main()
         error(("peripheral '%s' cannot push items (missing pushItems method)"):format(config.INPUT_CONTAINER), 2)
     end
 
-    local active_mode = utils.is_trigger_on(config.AE2_CRAFT_TRIGGER_SIDE)
+    local active_mode = utils.is_trigger_on(config.AE2_CRAFT_EMITTER_SIDE)
     state.loop_status = active_mode and "wake" or "sleep"
     utils.render_status(STATUS_RENDER_OPTS)
 
@@ -175,7 +175,7 @@ local function main()
         if not active_mode then
             -- Sleep mode: wait only for rising edge.
             local event = { os.pullEvent("redstone") }
-            if event[1] == "redstone" and utils.is_trigger_on(config.AE2_CRAFT_TRIGGER_SIDE) then
+            if event[1] == "redstone" and utils.is_trigger_on(config.AE2_CRAFT_EMITTER_SIDE) then
                 active_mode = true
                 state.loop_status = "wake"
                 utils.render_status(STATUS_RENDER_OPTS)
@@ -185,7 +185,7 @@ local function main()
             run_once_if_ready(input)
             utils.render_status(STATUS_RENDER_OPTS)
 
-            if not utils.is_trigger_on(config.AE2_CRAFT_TRIGGER_SIDE) then
+            if not utils.is_trigger_on(config.AE2_CRAFT_EMITTER_SIDE) then
                 active_mode = false
                 state.loop_status = "sleep"
                 utils.render_status(STATUS_RENDER_OPTS)
